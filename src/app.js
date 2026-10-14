@@ -10,7 +10,13 @@ import { errorHandler } from './middlewares/error-handler.js';
 const app = express();
 app.disable('x-powered-by');
 app.use(helmet());
-app.use(cors({ origin: env.CORS_ORIGIN === '*' ? '*' : env.CORS_ORIGIN.split(',') }));
+app.use(cors({
+  origin: env.CORS_ORIGIN === '*' ? '*' : env.CORS_ORIGIN.split(',').map((o) => o.trim()),
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
+}));
+app.options('*', cors()); // handle preflight for all routes
 app.use(express.json({ limit: '1mb' }));
 app.use(pinoHttp());
 app.use(env.API_PREFIX, apiRouter);

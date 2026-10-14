@@ -1,11 +1,30 @@
 import { Router } from 'express';
+import { asyncHandler } from '../utils/async-handler.js';
+import { validateBody } from '../middlewares/validate.js';
 import { verifyJWT } from '../middlewares/auth.js';
-import { getCurrentUser, loginUser, registerUser, updateAccountDetails } from '../controllers/user.controller.js';
+import { updateProfileSchema } from '../models/user.schema.js';
 
-const router = Router();
-router.route('/register').post(registerUser);
-router.route('/login').post(loginUser);
-router.route('/current-user').get(verifyJWT, getCurrentUser);
-router.route('/update-account').patch(verifyJWT, updateAccountDetails);
+/**
+ * User profile routes — all protected by verifyJWT
+ * -------------------------------------------------
+ * GET  /users/profile  — get own profile
+ * PATCH /users/profile — update profile / delivery address
+ */
+export const createUserRouter = ({ userController }) => {
+  const router = Router();
 
-export default router;
+  router.get(
+    '/profile',
+    verifyJWT,
+    asyncHandler(userController.getProfile),
+  );
+
+  router.patch(
+    '/profile',
+    verifyJWT,
+    validateBody(updateProfileSchema),
+    asyncHandler(userController.updateProfile),
+  );
+
+  return router;
+};

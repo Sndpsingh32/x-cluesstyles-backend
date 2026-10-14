@@ -1,9 +1,48 @@
 import { Router } from 'express';
-import userRouter from './user.routes.js';
-import { healthcheck } from '../controllers/health.controller.js';
+import { asyncHandler } from '../utils/async-handler.js';
+import { createAuthRouter } from './auth.routes.js';
+import { createUserRouter } from './user.routes.js';
+import {
+  createCategoryRouter,
+  createSubCategoryRouter,
+  createSubSubCategoryRouter,
+} from './category.routes.js';
+import { createContainer } from '../container.js';
 
-const router = Router();
-router.get('/health', healthcheck);
-router.use('/users', userRouter);
+let _router;
 
-export default router;
+const buildRouter = () => {
+  const {
+    authController,
+    userController,
+    healthController,
+    categoryController,
+    subCategoryController,
+    subSubCategoryController,
+  } = createContainer();
+
+  const router = Router();
+
+  // Health — public
+  router.get('/health', asyncHandler((req, res) => healthController.check(req, res)));
+
+  // Auth — public
+  router.use('/auth', createAuthRouter({ authController }));
+
+  // Users — JWT protected
+  router.use('/users', createUserRouter({ userController }));
+
+  // Categories — public read / admin write
+  router.use('/categories',       createCategoryRouter({ categoryController }));
+  router.use('/subcategories',    createSubCategoryRouter({ subCategoryController }));
+  router.use('/subsubcategories', createSubSubCategoryRouter({ subSubCategoryController }));
+
+  return router;
+};
+
+const lazyRouter = (req, res, next) => {
+  if (!_router) _router = buildRouter();
+  _router(req, res, next);
+};
+
+export default lazyRouter;

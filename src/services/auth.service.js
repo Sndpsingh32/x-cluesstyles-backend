@@ -1,24 +1,62 @@
-import bcrypt from 'bcryptjs';
 import { randomUUID } from 'node:crypto';
 import { HTTP_STATUS } from '../constants/http-status.js';
 import { createAppError } from '../utils/app-error.js';
 import { createAccessToken } from '../utils/token.js';
+import { generateOtp, saveOtp, verifyOtp as checkOtp } from '../utils/otp-store.js';
 
-const credentials = (user) => ({ user, accessToken: createAccessToken(user), tokenType: 'Bearer' });
+/**
+ * OTP-based auth flow
+ * -------------------
+ * Step 1 — POST /auth/send-otp   { phone }
+ *   • Generates a 6-digit OTP and stores it in the OTP store (5 min TTL).
+ *   • In production: send OTP via SMS gateway (Twilio, MSG91, etc.).
+ *   • Returns the OTP in the response for now (dev/test only).
+ *
+ * Step 2 — POST /auth/verify-otp  { phone, otp }
+ *   • Validates the OTP.
+ *   • If user doesn't exist yet → auto-registers with just the phone number.
+ *   • Returns a JWT access token + user object.
+ */
+export const createAuthService = ({ userRepository }) =>
+  Object.freeze({
+    /**
+     * Generate and (in production) dispatch an OTP for the given phone number.
+     * Returns the OTP so the controller can include it in the dev response.
+     */
+    sendOtp: async ({ phone }) => {
+      const otp = generateOtp();
+      saveOtp(phone, otp);
 
-export const createAuthService = ({ userRepository }) => Object.freeze({
-  register: async ({ name, email, password }) => {
-    if (await userRepository.findByEmail(email)) throw createAppError('Email already exists', HTTP_STATUS.CONFLICT);
-    const passwordHash = await bcrypt.hash(password, 12);
-    const user = await userRepository.create({ id: randomUUID(), name, email, passwordHash });
-    return credentials(user);
-  },
-  login: async ({ email, password }) => {
-    const user = await userRepository.findByEmail(email);
-    if (!user || !(await bcrypt.compare(password, user.password_hash))) {
-      throw createAppError('Invalid email or password', HTTP_STATUS.UNAUTHORIZED);
-    }
-    const safeUser = { id: user.id, name: user.name, email: user.email, role: user.role };
-    return credentials(safeUser);
-  },
-});
+      // TODO: replace the log below with a real SMS call
+      // e.g.  await smsGateway.send(phone, `Your OTP is ${otp}`)
+      console.log(`[DEV] OTP for ${phone}: ${otp}`);
+
+      return { otp }; // controller strips this out in production
+    },
+
+    /**
+     * Verify OTP → auto-register on first visit → return JWT.
+     */
+    verifyOtp: async ({ phone, otp }) => {
+      // 1. Check OTP validity
+      const isValid = checkOtp(phone, otp);
+      if (!isValid) {
+        throw createAppError('Invalid or expired OTP', HTTP_STATUS.UNAUTHORIZED);
+      }
+
+      // 2. Find or create the user
+      let user = await userRepository.findByPhone(phone);
+      if (!user) {
+        user = await userRepository.create({ id: randomUUID(), phone });
+      }
+
+      // 3. Issue JWT
+      const accessToken = createAccessToken(user);
+      return {
+        user,
+        accessToken,
+        tokenType: 'Bearer',
+        isNewUser: !user.fullName, // hint to frontend: profile incomplete
+      };
+    },
+  });
