@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS users (
   phone        VARCHAR(20)   NOT NULL UNIQUE,
   full_name    VARCHAR(100)  NULL,
   email        VARCHAR(255)  NULL UNIQUE,
-  avatar       VARCHAR(2048) NULL,
+  avatar       VARCHAR(8192) NULL,
 
   -- Delivery / billing address (filled at checkout or profile update)
   address_line VARCHAR(255)  NULL,

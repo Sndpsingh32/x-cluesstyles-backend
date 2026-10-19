@@ -1,5 +1,56 @@
+import bcrypt from 'bcryptjs';
 import { HTTP_STATUS } from '../constants/http-status.js';
 import { sendSuccess } from '../utils/api-response.js';
+import { getDatabase } from '../db/index.js';
+
+export const registerUser = async (req, res, next) => {
+  try {
+    const db = getDatabase();
+    const { fullName, username, email, password } = req.body ?? {};
+
+    if (!fullName || !username || !email || !password) {
+      return res.status(400).json({ statusCode: 400, message: 'Missing required registration fields' });
+    }
+
+    const normalizedName = fullName.trim();
+    const normalizedUsername = username.trim().toLowerCase();
+    const normalizedEmail = email.trim().toLowerCase();
+
+    const existing = await db.users.findByEmailOrUsername?.(normalizedUsername, normalizedEmail)
+      ?? await db.users.findByEmail?.(normalizedEmail)
+      ?? await db.users.findByUsername?.(normalizedUsername);
+
+    if (existing) {
+      const error = new Error('User with this email or username already exists');
+      if (typeof next === 'function') {
+        return next(error);
+      }
+      throw error;
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+    const user = await db.users.create({
+      id: crypto?.randomUUID?.() ?? String(Date.now()),
+      fullName: normalizedName,
+      username: normalizedUsername,
+      email: normalizedEmail,
+      passwordHash,
+    });
+
+    return res.status(201).json({
+      statusCode: 201,
+      message: 'User registered successfully',
+      data: {
+        id: user.id,
+        fullName: user.fullName ?? normalizedName,
+        username: user.username ?? normalizedUsername,
+        email: user.email ?? normalizedEmail,
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
 
 export const createUserController = ({ userService }) =>
   Object.freeze({

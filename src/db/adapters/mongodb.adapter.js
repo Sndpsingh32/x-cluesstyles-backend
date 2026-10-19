@@ -1,5 +1,27 @@
 import mongoose from 'mongoose';
 
+const productSchema = new mongoose.Schema(
+  {
+    name:        { type: String, required: true, trim: true },
+    slug:        { type: String, required: true, unique: true, trim: true, lowercase: true },
+    category:    { type: String, default: 'uncategorized', trim: true },
+    subcategory: { type: String, default: null, trim: true },
+    description: { type: String, default: null },
+    image:       { type: String, default: null },
+    price:       { type: Number, default: 0 },
+    compareAtPrice: { type: Number, default: null },
+    stock:       { type: Number, default: 0 },
+    active:      { type: Boolean, default: true },
+    featured:    { type: Boolean, default: false },
+    tags:        [{ type: String }],
+    colors:      [{ type: String }],
+    sizes:       [{ type: String }],
+    attributes:  { type: mongoose.Schema.Types.Mixed, default: {} },
+    customization: { type: mongoose.Schema.Types.Mixed, default: {} },
+  },
+  { timestamps: true, versionKey: false },
+);
+
 const userSchema = new mongoose.Schema(
   {
     phone:       { type: String, required: true, unique: true, trim: true },
@@ -35,9 +57,33 @@ const toUser = (doc) =>
     updatedAt:   doc.updatedAt,
   };
 
+const toProduct = (doc) =>
+  doc && {
+    id: doc._id.toString(),
+    category: doc.category,
+    subcategory: doc.subcategory,
+    name: doc.name,
+    slug: doc.slug,
+    description: doc.description,
+    image: doc.image,
+    price: Number(doc.price ?? 0),
+    compareAtPrice: doc.compareAtPrice ?? null,
+    stock: Number(doc.stock ?? 0),
+    active: !!doc.active,
+    featured: !!doc.featured,
+    tags: doc.tags || [],
+    colors: doc.colors || [],
+    sizes: doc.sizes || [],
+    attributes: doc.attributes || {},
+    customization: doc.customization || {},
+    createdAt: doc.createdAt,
+    updatedAt: doc.updatedAt,
+  };
+
 export const createMongoDbAdapter = async (env) => {
   const connection = await mongoose.connect(env.MONGODB_URI, { dbName: env.MONGODB_DATABASE });
   const User = connection.models.User || connection.model('User', userSchema);
+  const Product = connection.models.Product || connection.model('Product', productSchema);
 
   return Object.freeze({
     client: 'mongodb',
@@ -46,7 +92,10 @@ export const createMongoDbAdapter = async (env) => {
       await connection.connection.db.admin().ping();
     },
 
-    migrate: () => User.init(),
+    migrate: async () => {
+      await User.init();
+      await Product.init();
+    },
 
     users: Object.freeze({
       findById: async (id) =>
@@ -69,7 +118,6 @@ export const createMongoDbAdapter = async (env) => {
 
       /** Register a new user — only phone required */
       create: async ({ id, phone, role = 'user' }) => {
-        // MongoDB generates its own _id; ignore the supplied UUID id for Mongo
         const doc = await User.create({ phone, role });
         return toUser(doc);
       },
@@ -82,6 +130,30 @@ export const createMongoDbAdapter = async (env) => {
           { new: true, runValidators: true },
         );
         return toUser(doc);
+      },
+    }),
+
+    products: Object.freeze({
+      findAll: async (filters = {}) => {
+        const query = {};
+        if (filters.active !== undefined) query.active = !!filters.active;
+        if (filters.featured !== undefined) query.featured = !!filters.featured;
+        if (filters.category) query.category = filters.category;
+        if (filters.subcategory) query.subcategory = filters.subcategory;
+        return (await Product.find(query).sort({ createdAt: -1 })).map(toProduct);
+      },
+      findById: async (id) => (mongoose.isValidObjectId(id) ? toProduct(await Product.findById(id)) : null),
+      findBySlug: async (slug) => toProduct(await Product.findOne({ slug })),
+      existsBySlug: async (slug, excludeId = null) => {
+        const doc = await Product.findOne({ slug }).select('_id').lean();
+        if (!doc) return false;
+        return excludeId ? doc._id.toString() !== excludeId : true;
+      },
+      create: async (data) => toProduct(await Product.create(data)),
+      update: async (id, fields) => toProduct(await Product.findByIdAndUpdate(id, { $set: fields }, { new: true, runValidators: true })),
+      delete: async (id) => {
+        const result = await Product.deleteOne({ _id: id });
+        return result.deletedCount > 0;
       },
     }),
 

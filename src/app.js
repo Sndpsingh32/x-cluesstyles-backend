@@ -18,6 +18,7 @@ app.use(cors({
 }));
 app.options('*', cors()); // handle preflight for all routes
 app.use(express.json({ limit: '1mb' }));
+app.use('/uploads', express.static('uploads'));
 app.use(pinoHttp());
 app.use(env.API_PREFIX, apiRouter);
 app.use(notFound);

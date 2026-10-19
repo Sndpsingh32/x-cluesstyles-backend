@@ -4,6 +4,37 @@ import { createAppError } from '../utils/app-error.js';
 export const createUserService = ({ userRepository }) =>
   Object.freeze({
     /**
+     * Create a user record for legacy flows and admin bootstrapping.
+     */
+    create: async (userData = {}) => {
+      const { email, username, ...rest } = userData;
+      const normalizedEmail = email?.trim().toLowerCase();
+      const normalizedUsername = username?.trim().toLowerCase();
+
+      if (normalizedEmail && userRepository.findByEmail) {
+        const existingEmail = await userRepository.findByEmail(normalizedEmail);
+        if (existingEmail) {
+          throw createAppError('User with this email already exists', HTTP_STATUS.CONFLICT);
+        }
+      }
+
+      if (normalizedUsername && userRepository.findByUsername) {
+        const existingUser = await userRepository.findByUsername(normalizedUsername);
+        if (existingUser) {
+          throw createAppError('User with this username already exists', HTTP_STATUS.CONFLICT);
+        }
+      }
+
+      const created = await userRepository.create({
+        ...rest,
+        email: normalizedEmail,
+        username: normalizedUsername,
+      });
+
+      return created;
+    },
+
+    /**
      * Return the authenticated user's full profile.
      */
     getProfile: async (userId) => {

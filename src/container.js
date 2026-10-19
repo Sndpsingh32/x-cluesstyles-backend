@@ -21,6 +21,9 @@ import {
   createSubCategoryController,
   createSubSubCategoryController,
 } from './controllers/category.controller.js';
+import { createProductRepository } from './repositories/product.repository.js';
+import { createProductService } from './services/product.service.js';
+import { createProductController } from './controllers/product.controller.js';
 
 export const createContainer = ({ db = getDatabase() } = {}) => {
   // --- Repositories ---
@@ -28,6 +31,7 @@ export const createContainer = ({ db = getDatabase() } = {}) => {
   const categoryRepository       = createCategoryRepository({ db });
   const subCategoryRepository    = createSubCategoryRepository({ db });
   const subSubCategoryRepository = createSubSubCategoryRepository({ db });
+  const productRepository        = createProductRepository({ db });
 
   // --- Services ---
   const userService           = createUserService({ userRepository });
@@ -36,6 +40,7 @@ export const createContainer = ({ db = getDatabase() } = {}) => {
   const categoryService       = createCategoryService({ categoryRepository });
   const subCategoryService    = createSubCategoryService({ subCategoryRepository, categoryRepository });
   const subSubCategoryService = createSubSubCategoryService({ subSubCategoryRepository, subCategoryRepository });
+  const productService        = createProductService({ productRepository });
 
   // --- Controllers ---
   const userController           = createUserController({ userService });
@@ -44,10 +49,11 @@ export const createContainer = ({ db = getDatabase() } = {}) => {
   const categoryController       = createCategoryController({ categoryService });
   const subCategoryController    = createSubCategoryController({ subCategoryService });
   const subSubCategoryController = createSubSubCategoryController({ subSubCategoryService });
+  const productController        = createProductController({ productService });
 
   return Object.freeze({
-    userRepository, categoryRepository, subCategoryRepository, subSubCategoryRepository,
-    userService, authService, healthService, categoryService, subCategoryService, subSubCategoryService,
-    userController, authController, healthController, categoryController, subCategoryController, subSubCategoryController,
+    userRepository, categoryRepository, subCategoryRepository, subSubCategoryRepository, productRepository,
+    userService, authService, healthService, categoryService, subCategoryService, subSubCategoryService, productService,
+    userController, authController, healthController, categoryController, subCategoryController, subSubCategoryController, productController,
   });
 };

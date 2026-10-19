@@ -9,23 +9,38 @@ const slugField = z
   .max(120)
   .optional();
 
+const MAX_IMAGE_URL_LENGTH = 8192;
+
+const imageField = z
+  .string()
+  .trim()
+  .max(MAX_IMAGE_URL_LENGTH)
+  .optional()
+  .nullable()
+  .transform((v) => (v === '' ? null : v));
+
+const booleanField = z.preprocess(
+  (v) => (v === 'true' || v === '1' || v === 1 ? true : v === 'false' || v === '0' || v === 0 ? false : v),
+  z.boolean(),
+);
+
 const baseFields = {
-  name:        z.string().trim().min(2).max(100),
-  slug:        slugField,
+  name:      z.string().trim().min(2).max(100),
+  slug:      slugField,
   description: z.string().trim().max(500).optional().nullable(),
-  image:       z.string().trim().url().max(2048).optional().nullable(),
-  sortOrder:   z.coerce.number().int().min(0).default(0),
+  image:     imageField,
+  sortOrder: z.coerce.number().int().min(0).default(0),
 };
 
 const baseUpdateFields = {
-  name:        z.string().trim().min(2).max(100),
-  slug:        z.string().trim().toLowerCase()
+  name:      z.string().trim().min(2).max(100),
+  slug:      z.string().trim().toLowerCase()
     .regex(/^[a-z0-9-]+$/, 'Slug can only contain lowercase letters, numbers and hyphens')
     .max(120),
   description: z.string().trim().max(500).nullable(),
-  image:       z.string().trim().url().max(2048).nullable(),
-  isActive:    z.boolean(),
-  sortOrder:   z.coerce.number().int().min(0),
+  image:     imageField,
+  isActive:  booleanField,
+  sortOrder: z.coerce.number().int().min(0),
 };
 
 // ---------------------------------------------------------------------------
@@ -67,16 +82,30 @@ export const updateSubSubCategorySchema = z
 // ---------------------------------------------------------------------------
 // Query params
 // ---------------------------------------------------------------------------
-export const categoryQuerySchema = z.object({
+const SORT_FIELDS = ['name', 'created', 'status', 'active', 'category', 'products'];
+const SORT_DIRECTIONS = ['asc', 'desc'];
+
+const paginatedQuerySchema = z.object({
+  search: z.string().trim().optional(),
+  q: z.string().trim().optional(),
+  sortBy: z.enum(SORT_FIELDS).optional(),
+  sort: z.enum(SORT_FIELDS).optional(),
+  sortDir: z.enum(SORT_DIRECTIONS).optional(),
+  dir: z.enum(SORT_DIRECTIONS).optional(),
+  page: z.coerce.number().int().min(1).optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
   isActive: z.enum(['true', 'false']).transform((v) => v === 'true').optional(),
+  state: z.enum(['all', 'live', 'hidden']).optional(),
 });
 
-export const subCategoryQuerySchema = z.object({
+export const categoryQuerySchema = paginatedQuerySchema;
+
+export const subCategoryQuerySchema = paginatedQuerySchema.extend({
   categoryId: z.string().uuid().optional(),
-  isActive:   z.enum(['true', 'false']).transform((v) => v === 'true').optional(),
+  dept: z.string().optional(),
 });
 
-export const subSubCategoryQuerySchema = z.object({
+export const subSubCategoryQuerySchema = paginatedQuerySchema.extend({
   subcategoryId: z.string().uuid().optional(),
-  isActive:      z.enum(['true', 'false']).transform((v) => v === 'true').optional(),
+  parent: z.string().optional(),
 });

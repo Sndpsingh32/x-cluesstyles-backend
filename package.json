@@ -9,19 +9,23 @@
     "start": "node src/index.js",
     "test": "node --test",
     "lint": "eslint .",
-    "db:migrate": "node src/db/migrate.js"
+    "db:migrate": "node src/db/migrate.js",
+    "set-admin": "node src/scripts/set-admin.js",
+    "seed:categories": "node src/scripts/seed-categories.js"
   },
   "engines": {
     "node": ">=20"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
+    "cloudinary": "^2.11.0",
     "cors": "^2.8.5",
-    "dotenv": "^16.4.7",
+    "dotenv": "^16.6.1",
     "express": "^4.21.2",
     "helmet": "^8.0.0",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.24.5",
+    "multer": "^2.4.0",
     "mysql2": "^3.12.0",
     "pino-http": "^10.3.0",
     "zod": "^3.24.1"

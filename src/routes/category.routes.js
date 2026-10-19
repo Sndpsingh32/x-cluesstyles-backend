@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { asyncHandler } from '../utils/async-handler.js';
 import { validateBody, validateQuery } from '../middlewares/validate.js';
 import { verifyJWT, requireRole } from '../middlewares/auth.js';
+import { upload, handleImageUpload } from '../middlewares/upload.js';
 import {
   createCategorySchema,
   updateCategorySchema,
@@ -26,8 +27,22 @@ export const createCategoryRouter = ({ categoryController }) => {
   router.get('/slug/:slug',    asyncHandler(categoryController.getBySlug));
   router.get('/:id',           asyncHandler(categoryController.getById));
   router.get('/',              validateQuery(categoryQuerySchema), asyncHandler(categoryController.getAll));
-  router.post('/',             ...adminGuard, validateBody(createCategorySchema),   asyncHandler(categoryController.create));
-  router.patch('/:id',         ...adminGuard, validateBody(updateCategorySchema),   asyncHandler(categoryController.update));
+  router.post(
+    '/',
+    ...adminGuard,
+    upload.single('image'),
+    handleImageUpload('xcluesstyles/categories'),
+    validateBody(createCategorySchema),
+    asyncHandler(categoryController.create),
+  );
+  router.patch(
+    '/:id',
+    ...adminGuard,
+    upload.single('image'),
+    handleImageUpload('xcluesstyles/categories'),
+    validateBody(updateCategorySchema),
+    asyncHandler(categoryController.update),
+  );
   router.delete('/:id',        ...adminGuard, asyncHandler(categoryController.delete));
 
   return router;
@@ -42,8 +57,22 @@ export const createSubCategoryRouter = ({ subCategoryController }) => {
   router.get('/slug/:slug',    asyncHandler(subCategoryController.getBySlug));
   router.get('/:id',           asyncHandler(subCategoryController.getById));
   router.get('/',              validateQuery(subCategoryQuerySchema), asyncHandler(subCategoryController.getAll));
-  router.post('/',             ...adminGuard, validateBody(createSubCategorySchema),   asyncHandler(subCategoryController.create));
-  router.patch('/:id',         ...adminGuard, validateBody(updateSubCategorySchema),   asyncHandler(subCategoryController.update));
+  router.post(
+    '/',
+    ...adminGuard,
+    upload.single('image'),
+    handleImageUpload('xcluesstyles/subcategories'),
+    validateBody(createSubCategorySchema),
+    asyncHandler(subCategoryController.create),
+  );
+  router.patch(
+    '/:id',
+    ...adminGuard,
+    upload.single('image'),
+    handleImageUpload('xcluesstyles/subcategories'),
+    validateBody(updateSubCategorySchema),
+    asyncHandler(subCategoryController.update),
+  );
   router.delete('/:id',        ...adminGuard, asyncHandler(subCategoryController.delete));
 
   return router;
@@ -58,8 +87,22 @@ export const createSubSubCategoryRouter = ({ subSubCategoryController }) => {
   router.get('/slug/:slug',    asyncHandler(subSubCategoryController.getBySlug));
   router.get('/:id',           asyncHandler(subSubCategoryController.getById));
   router.get('/',              validateQuery(subSubCategoryQuerySchema), asyncHandler(subSubCategoryController.getAll));
-  router.post('/',             ...adminGuard, validateBody(createSubSubCategorySchema),   asyncHandler(subSubCategoryController.create));
-  router.patch('/:id',         ...adminGuard, validateBody(updateSubSubCategorySchema),   asyncHandler(subSubCategoryController.update));
+  router.post(
+    '/',
+    ...adminGuard,
+    upload.single('image'),
+    handleImageUpload('xcluesstyles/subsubcategories'),
+    validateBody(createSubSubCategorySchema),
+    asyncHandler(subSubCategoryController.create),
+  );
+  router.patch(
+    '/:id',
+    ...adminGuard,
+    upload.single('image'),
+    handleImageUpload('xcluesstyles/subsubcategories'),
+    validateBody(updateSubSubCategorySchema),
+    asyncHandler(subSubCategoryController.update),
+  );
   router.delete('/:id',        ...adminGuard, asyncHandler(subSubCategoryController.delete));
 
   return router;

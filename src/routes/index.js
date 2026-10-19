@@ -7,6 +7,8 @@ import {
   createSubCategoryRouter,
   createSubSubCategoryRouter,
 } from './category.routes.js';
+import { createProductRouter } from './product.routes.js';
+import { createUploadRouter } from './upload.routes.js';
 import { createContainer } from '../container.js';
 
 let _router;
@@ -19,6 +21,7 @@ const buildRouter = () => {
     categoryController,
     subCategoryController,
     subSubCategoryController,
+    productController,
   } = createContainer();
 
   const router = Router();
@@ -29,6 +32,9 @@ const buildRouter = () => {
   // Auth — public
   router.use('/auth', createAuthRouter({ authController }));
 
+  // Upload — admin
+  router.use('/upload', createUploadRouter());
+
   // Users — JWT protected
   router.use('/users', createUserRouter({ userController }));
 
@@ -36,6 +42,7 @@ const buildRouter = () => {
   router.use('/categories',       createCategoryRouter({ categoryController }));
   router.use('/subcategories',    createSubCategoryRouter({ subCategoryController }));
   router.use('/subsubcategories', createSubSubCategoryRouter({ subSubCategoryController }));
+  router.use('/products',         createProductRouter({ productController }));
 
   return router;
 };

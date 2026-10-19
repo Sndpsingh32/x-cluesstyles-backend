@@ -19,11 +19,11 @@ export const createCategoryController = ({ categoryService }) =>
 
     /** GET /categories */
     getAll: async (req, res) => {
-      const categories = await categoryService.getAll(req.query);
+      const result = await categoryService.getAll(req.query);
       return sendSuccess(res, {
         statusCode: HTTP_STATUS.OK,
         message: 'Categories fetched successfully',
-        data: { categories },
+        data: result,
       });
     },
 
@@ -86,11 +86,11 @@ export const createSubCategoryController = ({ subCategoryService }) =>
 
     /** GET /subcategories?categoryId=&isActive= */
     getAll: async (req, res) => {
-      const subcategories = await subCategoryService.getAll(req.query);
+      const result = await subCategoryService.getAll(req.query);
       return sendSuccess(res, {
         statusCode: HTTP_STATUS.OK,
         message: 'SubCategories fetched successfully',
-        data: { subcategories },
+        data: result,
       });
     },
 
@@ -153,11 +153,11 @@ export const createSubSubCategoryController = ({ subSubCategoryService }) =>
 
     /** GET /subsubcategories?subcategoryId=&isActive= */
     getAll: async (req, res) => {
-      const subsubcategories = await subSubCategoryService.getAll(req.query);
+      const result = await subSubCategoryService.getAll(req.query);
       return sendSuccess(res, {
         statusCode: HTTP_STATUS.OK,
         message: 'SubSubCategories fetched successfully',
-        data: { subsubcategories },
+        data: result,
       });
     },
 

@@ -46,7 +46,7 @@ export const updateProfileSchema = z
   .object({
     fullName:    z.string().trim().min(2).max(100),
     email:       z.string().trim().email().max(255).toLowerCase(),
-    avatar:      z.string().trim().url().max(2048),
+    avatar:      z.union([z.string().trim().url().max(8192), z.literal('')]).optional(),
     addressLine: z.string().trim().min(3).max(255),
     city:        z.string().trim().min(2).max(100),
     state:       z.string().trim().min(2).max(100),

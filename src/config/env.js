@@ -3,12 +3,12 @@ import { z } from 'zod';
 
 const rawEnv = {
   ...process.env,
-  MYSQL_HOST: process.env.MYSQL_HOST ?? process.env.DB_HOST ?? process.env.MYSQL_HOST,
-  MYSQL_PORT: process.env.MYSQL_PORT ?? process.env.DB_PORT ?? process.env.MYSQL_PORT,
-  MYSQL_DATABASE: process.env.MYSQL_DATABASE ?? process.env.DB_NAME ?? process.env.MYSQL_DATABASE,
-  MYSQL_USER: process.env.MYSQL_USER ?? process.env.DB_USER ?? process.env.MYSQL_USER,
-  MYSQL_PASSWORD: process.env.MYSQL_PASSWORD ?? process.env.DB_PASSWORD ?? process.env.MYSQL_PASSWORD,
-  MYSQL_CONNECTION_LIMIT: process.env.MYSQL_CONNECTION_LIMIT ?? process.env.DB_CONNECTION_LIMIT ?? process.env.MYSQL_CONNECTION_LIMIT,
+  MYSQL_HOST: process.env.DB_HOST ?? process.env.MYSQL_HOST ?? 'localhost',
+  MYSQL_PORT: process.env.DB_PORT ?? process.env.MYSQL_PORT ?? '3306',
+  MYSQL_DATABASE: process.env.DB_NAME ?? process.env.MYSQL_DATABASE ?? 'starter_db',
+  MYSQL_USER: process.env.DB_USER ?? process.env.MYSQL_USER ?? 'root',
+  MYSQL_PASSWORD: process.env.DB_PASSWORD ?? process.env.MYSQL_PASSWORD ?? '',
+  MYSQL_CONNECTION_LIMIT: process.env.DB_CONNECTION_LIMIT ?? process.env.MYSQL_CONNECTION_LIMIT ?? '10',
 };
 
 const schema = z.object({
@@ -27,6 +27,10 @@ const schema = z.object({
   MONGODB_DATABASE: z.string().min(1).default('starter_db'),
   JWT_SECRET: z.string().min(32).default('development-only-secret-change-me-123'),
   JWT_EXPIRES_IN: z.string().default('1d'),
+  CLOUDINARY_CLOUD_NAME: z.string().optional(),
+  CLOUDINARY_API_KEY: z.string().optional(),
+  CLOUDINARY_API_SECRET: z.string().optional(),
+  CLOUDINARY_URL: z.string().optional(),
 });
 
 export const env = Object.freeze(schema.parse(rawEnv));
