@@ -166,7 +166,7 @@ export const createMySqlAdapter = (env) => {
         name             VARCHAR(100)  NOT NULL,
         slug             VARCHAR(120)  NOT NULL UNIQUE,
         description      VARCHAR(500)  NULL,
-        image            VARCHAR(8192) NULL,
+        image            TEXT          NULL,
         is_active        TINYINT(1)    NOT NULL DEFAULT 1,
         sort_order       INT           NOT NULL DEFAULT 0,
         created_at       TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -176,6 +176,23 @@ export const createMySqlAdapter = (env) => {
           ON DELETE CASCADE ON UPDATE CASCADE
       )
     `);
+
+    const ensureTextColumn = async (tableName, columnName, definition = 'TEXT NULL') => {
+      const [existing] = await pool.execute(`SHOW COLUMNS FROM ${tableName}`);
+      const column = existing.find((entry) => entry.Field === columnName || entry.field === columnName);
+      if (!column) {
+        await query(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${definition}`);
+        return;
+      }
+      const type = String(column.Type || '').toLowerCase();
+      if (!type.includes('text')) {
+        await query(`ALTER TABLE ${tableName} MODIFY COLUMN ${columnName} ${definition}`);
+      }
+    };
+
+    await ensureTextColumn('categories', 'image');
+    await ensureTextColumn('subcategories', 'image');
+    await ensureTextColumn('subsubcategories', 'image');
 
     await query(`
       CREATE TABLE IF NOT EXISTS products (
