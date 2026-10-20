@@ -24,6 +24,9 @@ import {
 import { createProductRepository } from './repositories/product.repository.js';
 import { createProductService } from './services/product.service.js';
 import { createProductController } from './controllers/product.controller.js';
+import { createOrderRepository } from './repositories/order.repository.js';
+import { createOrderService } from './services/order.service.js';
+import { createOrderController } from './controllers/order.controller.js';
 
 export const createContainer = ({ db = getDatabase() } = {}) => {
   // --- Repositories ---
@@ -32,6 +35,7 @@ export const createContainer = ({ db = getDatabase() } = {}) => {
   const subCategoryRepository    = createSubCategoryRepository({ db });
   const subSubCategoryRepository = createSubSubCategoryRepository({ db });
   const productRepository        = createProductRepository({ db });
+  const orderRepository         = createOrderRepository({ db });
 
   // --- Services ---
   const userService           = createUserService({ userRepository });
@@ -41,6 +45,7 @@ export const createContainer = ({ db = getDatabase() } = {}) => {
   const subCategoryService    = createSubCategoryService({ subCategoryRepository, categoryRepository });
   const subSubCategoryService = createSubSubCategoryService({ subSubCategoryRepository, subCategoryRepository });
   const productService        = createProductService({ productRepository });
+  const orderService          = createOrderService({ orderRepository });
 
   // --- Controllers ---
   const userController           = createUserController({ userService });
@@ -50,10 +55,11 @@ export const createContainer = ({ db = getDatabase() } = {}) => {
   const subCategoryController    = createSubCategoryController({ subCategoryService });
   const subSubCategoryController = createSubSubCategoryController({ subSubCategoryService });
   const productController        = createProductController({ productService });
+  const orderController          = createOrderController({ orderService });
 
   return Object.freeze({
-    userRepository, categoryRepository, subCategoryRepository, subSubCategoryRepository, productRepository,
-    userService, authService, healthService, categoryService, subCategoryService, subSubCategoryService, productService,
-    userController, authController, healthController, categoryController, subCategoryController, subSubCategoryController, productController,
+    userRepository, categoryRepository, subCategoryRepository, subSubCategoryRepository, productRepository, orderRepository,
+    userService, authService, healthService, categoryService, subCategoryService, subSubCategoryService, productService, orderService,
+    userController, authController, healthController, categoryController, subCategoryController, subSubCategoryController, productController, orderController,
   });
 };

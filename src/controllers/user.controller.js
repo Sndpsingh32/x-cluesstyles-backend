@@ -67,6 +67,51 @@ export const createUserController = ({ userService }) =>
       });
     },
 
+    getCustomizations: async (req, res) => {
+      const customizations = await userService.getCustomizations(req.user.id);
+      return sendSuccess(res, {
+        statusCode: HTTP_STATUS.OK,
+        message: 'Saved customizations fetched successfully',
+        data: { customizations },
+      });
+    },
+
+    saveCustomization: async (req, res) => {
+      const customizations = await userService.saveCustomization(req.user.id, req.body);
+      return sendSuccess(res, {
+        statusCode: HTTP_STATUS.CREATED,
+        message: 'Customization saved successfully',
+        data: { customizations },
+      });
+    },
+
+    getCustomizationById: async (req, res) => {
+      const customization = await userService.getCustomizationById(req.user.id, req.params.customizationId);
+      return sendSuccess(res, {
+        statusCode: HTTP_STATUS.OK,
+        message: 'Customization fetched successfully',
+        data: { customization },
+      });
+    },
+
+    updateCustomization: async (req, res) => {
+      const customization = await userService.updateCustomization(req.user.id, req.params.customizationId, req.body);
+      return sendSuccess(res, {
+        statusCode: HTTP_STATUS.OK,
+        message: 'Customization updated successfully',
+        data: { customization },
+      });
+    },
+
+    deleteCustomization: async (req, res) => {
+      const customizations = await userService.deleteCustomization(req.user.id, req.params.customizationId);
+      return sendSuccess(res, {
+        statusCode: HTTP_STATUS.OK,
+        message: 'Customization deleted successfully',
+        data: { customizations },
+      });
+    },
+
     /**
      * PATCH /users/profile
      * Body: any subset of { fullName, email, avatar, addressLine, city, state, pincode, country }

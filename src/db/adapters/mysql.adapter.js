@@ -38,7 +38,7 @@ export const createMySqlAdapter = (env) => {
   const userCols = `
     id, phone, full_name AS fullName, email, avatar,
     address_line AS addressLine, city, state, pincode, country,
-    role, created_at AS createdAt, updated_at AS updatedAt
+    customizations, role, created_at AS createdAt, updated_at AS updatedAt
   `;
 
   const catCols = `
@@ -67,6 +67,13 @@ export const createMySqlAdapter = (env) => {
     bulk_pricing AS bulkPricing, quantity_discount AS quantityDiscount, coupon_eligible AS couponEligible,
     active, featured, tags, colors, sizes, images, specifications, features, variants,
     attributes, customization, seo, created_at AS createdAt, updated_at AS updatedAt
+  `;
+
+  const orderCols = `
+    id, product_id AS productId, product_name AS productName, slug, category, subcategory, color, size,
+    quantity, order_type AS orderType, quantity_mode AS quantityMode, unit_price AS unitPrice,
+    total_price AS totalPrice, status, source, customer_name AS customerName, phone,
+    customization, notes, created_at AS createdAt, updated_at AS updatedAt
   `;
 
   const buildListResult = (items, total, page, limit, sortBy = 'name', sortDir = 'asc') => {
@@ -118,6 +125,7 @@ export const createMySqlAdapter = (env) => {
         state        VARCHAR(100)  NULL,
         pincode      VARCHAR(10)   NULL,
         country      VARCHAR(100)  NULL DEFAULT 'India',
+        customizations JSON        NULL,
         role         ENUM('user','admin') NOT NULL DEFAULT 'user',
         created_at   TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at   TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
@@ -190,9 +198,23 @@ export const createMySqlAdapter = (env) => {
       }
     };
 
+    const ensureJsonColumn = async (tableName, columnName, definition = 'JSON NULL') => {
+      const [existing] = await pool.execute(`SHOW COLUMNS FROM ${tableName}`);
+      const column = existing.find((entry) => entry.Field === columnName || entry.field === columnName);
+      if (!column) {
+        await query(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${definition}`);
+        return;
+      }
+      const type = String(column.Type || '').toLowerCase();
+      if (!type.includes('json')) {
+        await query(`ALTER TABLE ${tableName} MODIFY COLUMN ${columnName} ${definition}`);
+      }
+    };
+
     await ensureTextColumn('categories', 'image');
     await ensureTextColumn('subcategories', 'image');
     await ensureTextColumn('subsubcategories', 'image');
+    await ensureJsonColumn('users', 'customizations');
 
     await query(`
       CREATE TABLE IF NOT EXISTS products (
@@ -241,6 +263,32 @@ export const createMySqlAdapter = (env) => {
       )
     `);
 
+    await query(`
+      CREATE TABLE IF NOT EXISTS orders (
+        id            CHAR(36)      NOT NULL PRIMARY KEY,
+        product_id    VARCHAR(120)  NOT NULL,
+        product_name  VARCHAR(200)  NOT NULL,
+        slug          VARCHAR(200)  NULL,
+        category      VARCHAR(80)   NULL,
+        subcategory   VARCHAR(80)   NULL,
+        color         VARCHAR(80)   NOT NULL,
+        size          VARCHAR(40)   NOT NULL,
+        quantity      INT           NOT NULL DEFAULT 1,
+        order_type    VARCHAR(20)   NOT NULL DEFAULT 'plain',
+        quantity_mode VARCHAR(20)   NOT NULL DEFAULT 'single',
+        unit_price    DECIMAL(10,2) NOT NULL DEFAULT 0,
+        total_price   DECIMAL(10,2) NOT NULL DEFAULT 0,
+        status        VARCHAR(40)   NOT NULL DEFAULT 'pending',
+        source        VARCHAR(40)   NOT NULL DEFAULT 'frontend',
+        customer_name VARCHAR(120)  NULL,
+        phone         VARCHAR(30)   NULL,
+        customization JSON          NULL,
+        notes         TEXT          NULL,
+        created_at    TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at    TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )
+    `);
+
     const ensureColumn = async (name, definition) => {
       const [existing] = await pool.execute('SHOW COLUMNS FROM products');
       const columnExists = existing.some((column) => column.Field === name || column.field === name);
@@ -278,14 +326,23 @@ export const createMySqlAdapter = (env) => {
   // users
   // -------------------------------------------------------------------------
   const users = Object.freeze({
-    findById: (id) =>
-      findOne(`SELECT ${userCols} FROM users WHERE id = :id`, { id }),
+    findById: async (id) => {
+      const row = await findOne(`SELECT ${userCols} FROM users WHERE id = :id`, { id });
+      if (!row) return null;
+      return { ...row, customizations: parseJsonField(row.customizations, []) };
+    },
 
-    findByPhone: (phone) =>
-      findOne(`SELECT ${userCols} FROM users WHERE phone = :phone`, { phone }),
+    findByPhone: async (phone) => {
+      const row = await findOne(`SELECT ${userCols} FROM users WHERE phone = :phone`, { phone });
+      if (!row) return null;
+      return { ...row, customizations: parseJsonField(row.customizations, []) };
+    },
 
-    findByEmail: (email) =>
-      findOne(`SELECT ${userCols} FROM users WHERE email = :email`, { email }),
+    findByEmail: async (email) => {
+      const row = await findOne(`SELECT ${userCols} FROM users WHERE email = :email`, { email });
+      if (!row) return null;
+      return { ...row, customizations: parseJsonField(row.customizations, []) };
+    },
 
     existsByPhone: async (phone) =>
       !!(await findOne('SELECT id FROM users WHERE phone = :phone', { phone })),
@@ -296,25 +353,27 @@ export const createMySqlAdapter = (env) => {
       return excludeId ? row.id !== excludeId : true;
     },
 
-    create: async ({ id, phone, role = 'user' }) => {
+    create: async ({ id, phone, role = 'user', customizations = [] }) => {
       await query(
-        'INSERT INTO users (id, phone, role) VALUES (:id, :phone, :role)',
-        { id, phone, role },
+        'INSERT INTO users (id, phone, role, customizations) VALUES (:id, :phone, :role, :customizations)',
+        { id, phone, role, customizations: JSON.stringify(customizations) },
       );
-      return findOne(`SELECT ${userCols} FROM users WHERE id = :id`, { id });
+      return users.findById(id);
     },
 
     update: async (id, fields) => {
       const columnMap = {
         fullName: 'full_name', email: 'email', avatar: 'avatar',
         addressLine: 'address_line', city: 'city', state: 'state',
-        pincode: 'pincode', country: 'country',
+        pincode: 'pincode', country: 'country', customizations: 'customizations',
       };
       const valid = Object.entries(fields).filter(([k]) => columnMap[k]);
-      if (!valid.length) return findOne(`SELECT ${userCols} FROM users WHERE id = :id`, { id });
+      if (!valid.length) return users.findById(id);
       const assignments = valid.map(([k]) => `${columnMap[k]} = :${k}`).join(', ');
-      await query(`UPDATE users SET ${assignments} WHERE id = :id`, { ...Object.fromEntries(valid), id });
-      return findOne(`SELECT ${userCols} FROM users WHERE id = :id`, { id });
+      const payload = { ...Object.fromEntries(valid), id };
+      if (payload.customizations) payload.customizations = JSON.stringify(payload.customizations);
+      await query(`UPDATE users SET ${assignments} WHERE id = :id`, payload);
+      return users.findById(id);
     },
   });
 
@@ -579,9 +638,36 @@ export const createMySqlAdapter = (env) => {
       const vals = {};
       if (active !== undefined) { conditions.push('active = :active'); vals.active = active ? 1 : 0; }
       if (featured !== undefined) { conditions.push('featured = :featured'); vals.featured = featured ? 1 : 0; }
-      if (category) { conditions.push('category = :category'); vals.category = category; }
-      if (subcategory) { conditions.push('subcategory = :subcategory'); vals.subcategory = subcategory; }
-      if (subsubcategory) { conditions.push('subsubcategory = :subsubcategory'); vals.subsubcategory = subsubcategory; }
+      if (category) {
+        conditions.push(`(
+          LOWER(category) = LOWER(:category) OR
+          LOWER(category) = LOWER(:categoryName) OR
+          LOWER(REPLACE(category, ' ', '-')) = LOWER(:categorySlug)
+        )`);
+        vals.category = category;
+        vals.categoryName = category;
+        vals.categorySlug = category;
+      }
+      if (subcategory) {
+        conditions.push(`(
+          LOWER(subcategory) = LOWER(:subcategory) OR
+          LOWER(subcategory) = LOWER(:subcategoryName) OR
+          LOWER(REPLACE(subcategory, ' ', '-')) = LOWER(:subcategorySlug)
+        )`);
+        vals.subcategory = subcategory;
+        vals.subcategoryName = subcategory;
+        vals.subcategorySlug = subcategory;
+      }
+      if (subsubcategory) {
+        conditions.push(`(
+          LOWER(subsubcategory) = LOWER(:subsubcategory) OR
+          LOWER(subsubcategory) = LOWER(:subsubcategoryName) OR
+          LOWER(REPLACE(subsubcategory, ' ', '-')) = LOWER(:subsubcategorySlug)
+        )`);
+        vals.subsubcategory = subsubcategory;
+        vals.subsubcategoryName = subsubcategory;
+        vals.subsubcategorySlug = subsubcategory;
+      }
       const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
       const rows = await query(`SELECT ${productCols} FROM products ${where} ORDER BY created_at DESC`, vals);
       return rows.map((row) => ({
@@ -754,6 +840,107 @@ export const createMySqlAdapter = (env) => {
     delete: (id) => query('DELETE FROM products WHERE id = :id', { id }),
   });
 
+  const orders = Object.freeze({
+    findAll: async ({ status, orderType, productId, q, page = 1, limit = 20 } = {}) => {
+      const conditions = [];
+      const vals = {};
+
+      if (status) { conditions.push('status = :status'); vals.status = status; }
+      if (orderType) { conditions.push('order_type = :orderType'); vals.orderType = orderType; }
+      if (productId) { conditions.push('product_id = :productId'); vals.productId = productId; }
+      if (q) {
+        conditions.push('(LOWER(product_name) LIKE :search OR LOWER(color) LIKE :search OR LOWER(size) LIKE :search OR LOWER(customer_name) LIKE :search)');
+        vals.search = `%${String(q).toLowerCase()}%`;
+      }
+
+      const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+      const safePage = Math.max(1, Number(page) || 1);
+      const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 100);
+      const totalRow = await findOne(`SELECT COUNT(*) AS total FROM orders ${where}`, vals);
+      const total = Number(totalRow?.total || 0);
+      const offset = (safePage - 1) * safeLimit;
+      const rows = await query(
+        `SELECT ${orderCols} FROM orders ${where} ORDER BY created_at DESC LIMIT :limit OFFSET :offset`,
+        { ...vals, limit: safeLimit, offset },
+      );
+
+      return {
+        items: rows.map((row) => ({
+          ...row,
+          customization: parseJsonField(row.customization, {}),
+        })),
+        total,
+        page: safePage,
+        limit: safeLimit,
+        totalPages: Math.max(1, Math.ceil((total || 1) / safeLimit)),
+      };
+    },
+
+    findById: async (id) => {
+      const row = await findOne(`SELECT ${orderCols} FROM orders WHERE id = :id`, { id });
+      if (!row) return null;
+      return { ...row, customization: parseJsonField(row.customization, {}) };
+    },
+
+    create: async (data) => {
+      const payload = {
+        ...data,
+        quantity: Number(data.quantity ?? 1),
+        orderType: data.orderType ?? 'plain',
+        quantityMode: data.quantityMode ?? 'single',
+        unitPrice: Number(data.unitPrice ?? 0),
+        totalPrice: Number(data.totalPrice ?? (Number(data.unitPrice ?? 0) * Number(data.quantity ?? 1))),
+        status: data.status ?? 'pending',
+        source: data.source ?? 'frontend',
+        customization: JSON.stringify(data.customization ?? {}),
+      };
+
+      await query(`
+        INSERT INTO orders (
+          id, product_id, product_name, slug, category, subcategory, color, size, quantity,
+          order_type, quantity_mode, unit_price, total_price, status, source, customer_name,
+          phone, customization, notes
+        ) VALUES (
+          :id, :productId, :productName, :slug, :category, :subcategory, :color, :size, :quantity,
+          :orderType, :quantityMode, :unitPrice, :totalPrice, :status, :source, :customerName,
+          :phone, :customization, :notes
+        )`, payload);
+      return orders.findById(data.id);
+    },
+
+    update: async (id, fields) => {
+      const columnMap = {
+        productId: 'product_id',
+        productName: 'product_name',
+        slug: 'slug',
+        category: 'category',
+        subcategory: 'subcategory',
+        color: 'color',
+        size: 'size',
+        quantity: 'quantity',
+        orderType: 'order_type',
+        quantityMode: 'quantity_mode',
+        unitPrice: 'unit_price',
+        totalPrice: 'total_price',
+        status: 'status',
+        source: 'source',
+        customerName: 'customer_name',
+        phone: 'phone',
+        customization: 'customization',
+        notes: 'notes',
+      };
+      const valid = Object.entries(fields).filter(([k]) => columnMap[k]);
+      if (!valid.length) return orders.findById(id);
+      const assignments = valid.map(([k]) => `${columnMap[k]} = :${k}`).join(', ');
+      const payload = { id, ...Object.fromEntries(valid) };
+      if (payload.customization) payload.customization = JSON.stringify(payload.customization);
+      await query(`UPDATE orders SET ${assignments} WHERE id = :id`, payload);
+      return orders.findById(id);
+    },
+
+    delete: (id) => query('DELETE FROM orders WHERE id = :id', { id }),
+  });
+
   // -------------------------------------------------------------------------
   return Object.freeze({
     client: 'mysql',
@@ -764,6 +951,7 @@ export const createMySqlAdapter = (env) => {
     subcategories,
     subsubcategories,
     products,
+    orders,
     close: () => pool.end(),
   });
 };

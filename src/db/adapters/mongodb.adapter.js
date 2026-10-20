@@ -39,6 +39,30 @@ const userSchema = new mongoose.Schema(
   { timestamps: true, versionKey: false },
 );
 
+const orderSchema = new mongoose.Schema(
+  {
+    productId: { type: String, required: true, trim: true },
+    productName: { type: String, required: true, trim: true },
+    slug: { type: String, default: null, trim: true },
+    category: { type: String, default: null, trim: true },
+    subcategory: { type: String, default: null, trim: true },
+    color: { type: String, required: true, trim: true },
+    size: { type: String, required: true, trim: true },
+    quantity: { type: Number, default: 1, min: 1 },
+    orderType: { type: String, enum: ['plain', 'customize', 'bulk'], default: 'plain' },
+    quantityMode: { type: String, enum: ['single', 'bulk'], default: 'single' },
+    unitPrice: { type: Number, default: 0 },
+    totalPrice: { type: Number, default: 0 },
+    status: { type: String, default: 'pending', trim: true },
+    source: { type: String, default: 'frontend', trim: true },
+    customerName: { type: String, default: null, trim: true },
+    phone: { type: String, default: null, trim: true },
+    customization: { type: mongoose.Schema.Types.Mixed, default: {} },
+    notes: { type: String, default: null },
+  },
+  { timestamps: true, versionKey: false },
+);
+
 /** Map a Mongoose document to a plain public-safe object */
 const toUser = (doc) =>
   doc && {
@@ -80,10 +104,36 @@ const toProduct = (doc) =>
     updatedAt: doc.updatedAt,
   };
 
+const toOrder = (doc) =>
+  doc && {
+    id: doc._id.toString(),
+    productId: doc.productId,
+    productName: doc.productName,
+    slug: doc.slug,
+    category: doc.category,
+    subcategory: doc.subcategory,
+    color: doc.color,
+    size: doc.size,
+    quantity: Number(doc.quantity ?? 1),
+    orderType: doc.orderType || 'plain',
+    quantityMode: doc.quantityMode || 'single',
+    unitPrice: Number(doc.unitPrice ?? 0),
+    totalPrice: Number(doc.totalPrice ?? 0),
+    status: doc.status || 'pending',
+    source: doc.source || 'frontend',
+    customerName: doc.customerName || null,
+    phone: doc.phone || null,
+    customization: doc.customization || {},
+    notes: doc.notes || null,
+    createdAt: doc.createdAt,
+    updatedAt: doc.updatedAt,
+  };
+
 export const createMongoDbAdapter = async (env) => {
   const connection = await mongoose.connect(env.MONGODB_URI, { dbName: env.MONGODB_DATABASE });
   const User = connection.models.User || connection.model('User', userSchema);
   const Product = connection.models.Product || connection.model('Product', productSchema);
+  const Order = connection.models.Order || connection.model('Order', orderSchema);
 
   return Object.freeze({
     client: 'mongodb',
@@ -95,6 +145,7 @@ export const createMongoDbAdapter = async (env) => {
     migrate: async () => {
       await User.init();
       await Product.init();
+      await Order.init();
     },
 
     users: Object.freeze({
@@ -153,6 +204,23 @@ export const createMongoDbAdapter = async (env) => {
       update: async (id, fields) => toProduct(await Product.findByIdAndUpdate(id, { $set: fields }, { new: true, runValidators: true })),
       delete: async (id) => {
         const result = await Product.deleteOne({ _id: id });
+        return result.deletedCount > 0;
+      },
+    }),
+
+    orders: Object.freeze({
+      findAll: async (filters = {}) => {
+        const query = {};
+        if (filters.status) query.status = filters.status;
+        if (filters.orderType) query.orderType = filters.orderType;
+        if (filters.productId) query.productId = filters.productId;
+        return (await Order.find(query).sort({ createdAt: -1 })).map(toOrder);
+      },
+      findById: async (id) => (mongoose.isValidObjectId(id) ? toOrder(await Order.findById(id)) : null),
+      create: async (data) => toOrder(await Order.create(data)),
+      update: async (id, fields) => toOrder(await Order.findByIdAndUpdate(id, { $set: fields }, { new: true, runValidators: true })),
+      delete: async (id) => {
+        const result = await Order.deleteOne({ _id: id });
         return result.deletedCount > 0;
       },
     }),

@@ -13,6 +13,42 @@ test('creates a user using an injected repository', async () => {
   assert.equal(saved.length, 1);
 });
 
+test('saves and updates a user customization draft', async () => {
+  let currentUser = {
+    id: 'user-1',
+    customizations: [],
+  };
+
+  const service = createUserService({
+    userRepository: {
+      findById: async () => currentUser,
+      update: async (id, fields) => {
+        currentUser = { ...currentUser, ...fields };
+        return currentUser;
+      },
+    },
+  });
+
+  const created = await service.saveCustomization('user-1', {
+    productId: 'prod-1',
+    productName: 'Cotton Polo Tee',
+    customization: { text: 'Hello world', color: 'Black' },
+    quantity: 2,
+  });
+
+  assert.equal(created.length, 1);
+  assert.equal(created[0].productName, 'Cotton Polo Tee');
+  assert.equal(created[0].customization.text, 'Hello world');
+
+  const updated = await service.updateCustomization('user-1', created[0].id, {
+    customization: { text: 'Updated design', color: 'White' },
+    quantity: 3,
+  });
+
+  assert.equal(updated.customization.text, 'Updated design');
+  assert.equal(updated.quantity, 3);
+});
+
 test('supports legacy DB_* environment variables without defaulting to root', async () => {
   const originalEnv = { ...process.env };
 

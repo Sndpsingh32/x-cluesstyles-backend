@@ -8,6 +8,7 @@ import {
   createSubSubCategoryRouter,
 } from './category.routes.js';
 import { createProductRouter } from './product.routes.js';
+import { createOrderRouter } from './order.routes.js';
 import { createUploadRouter } from './upload.routes.js';
 import { createContainer } from '../container.js';
 
@@ -22,6 +23,7 @@ const buildRouter = () => {
     subCategoryController,
     subSubCategoryController,
     productController,
+    orderController,
   } = createContainer();
 
   const router = Router();
@@ -43,6 +45,7 @@ const buildRouter = () => {
   router.use('/subcategories',    createSubCategoryRouter({ subCategoryController }));
   router.use('/subsubcategories', createSubSubCategoryRouter({ subSubCategoryController }));
   router.use('/products',         createProductRouter({ productController }));
+  router.use('/orders',           createOrderRouter({ orderController }));
 
   return router;
 };

@@ -58,6 +58,36 @@ export const updateProfileSchema = z
     message: 'Provide at least one field to update',
   });
 
+export const savedCustomizationSchema = z.object({
+  id: z.string().trim().uuid().optional(),
+  productId: z.string().trim().min(1, 'Product is required').max(200),
+  productName: z.string().trim().min(1, 'Product name is required').max(200),
+  slug: z.string().trim().max(200).optional().nullable(),
+  category: z.string().trim().max(120).optional().nullable(),
+  subcategory: z.string().trim().max(120).optional().nullable(),
+  color: z.string().trim().max(80).optional().nullable(),
+  size: z.string().trim().max(40).optional().nullable(),
+  quantity: z.coerce.number().int().min(1).default(1),
+  orderType: z.enum(['plain', 'customize', 'bulk']).default('customize'),
+  price: z.coerce.number().min(0).optional().default(0),
+  totalPrice: z.coerce.number().min(0).optional().default(0),
+  customization: z.object({
+    text: z.string().trim().max(200).optional().nullable(),
+    note: z.string().trim().max(500).optional().nullable(),
+    placement: z.string().trim().max(80).optional().nullable(),
+    position: z.string().trim().max(80).optional().nullable(),
+    designType: z.string().trim().max(80).optional().nullable(),
+    color: z.string().trim().max(80).optional().nullable(),
+    fileUrl: z.string().trim().max(2048).optional().nullable(),
+    previewImage: z.string().trim().max(2048).optional().nullable(),
+    printSlots: z.array(z.any()).optional().default([]),
+    extra: z.record(z.any()).optional().default({}),
+  }).passthrough().default({}),
+  notes: z.string().trim().max(1000).optional().nullable(),
+  previewImage: z.string().trim().max(2048).optional().nullable(),
+  savedAt: z.string().trim().datetime().optional(),
+}).passthrough();
+
 // ---------------------------------------------------------------------------
 // Legacy schemas (kept for backwards-compat with existing auth.routes.js)
 // ---------------------------------------------------------------------------

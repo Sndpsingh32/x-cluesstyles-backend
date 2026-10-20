@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { asyncHandler } from '../utils/async-handler.js';
 import { validateBody } from '../middlewares/validate.js';
 import { verifyJWT } from '../middlewares/auth.js';
-import { updateProfileSchema } from '../models/user.schema.js';
+import { savedCustomizationSchema, updateProfileSchema } from '../models/user.schema.js';
 
 /**
  * User profile routes — all protected by verifyJWT
@@ -17,6 +17,38 @@ export const createUserRouter = ({ userController }) => {
     '/profile',
     verifyJWT,
     asyncHandler(userController.getProfile),
+  );
+
+  router.get(
+    '/customizations',
+    verifyJWT,
+    asyncHandler(userController.getCustomizations),
+  );
+
+  router.post(
+    '/customizations',
+    verifyJWT,
+    validateBody(savedCustomizationSchema),
+    asyncHandler(userController.saveCustomization),
+  );
+
+  router.get(
+    '/customizations/:customizationId',
+    verifyJWT,
+    asyncHandler(userController.getCustomizationById),
+  );
+
+  router.patch(
+    '/customizations/:customizationId',
+    verifyJWT,
+    validateBody(savedCustomizationSchema.partial()),
+    asyncHandler(userController.updateCustomization),
+  );
+
+  router.delete(
+    '/customizations/:customizationId',
+    verifyJWT,
+    asyncHandler(userController.deleteCustomization),
   );
 
   router.patch(
