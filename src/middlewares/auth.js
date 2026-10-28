@@ -22,7 +22,10 @@ export const verifyJWT = asyncHandler(async (req, _res, next) => {
     throw createAppError('Invalid or expired authentication token', 401);
   }
 
-  const user = await User.findById(decoded.sub);
+  const userId = decoded?.sub || decoded?.id;
+  if (!userId) throw createAppError('Invalid token: missing subject', 401);
+
+  const user = await User.findById(userId);
   if (!user) throw createAppError('User not found or account deleted', 401);
 
   req.user = user; // { id, phone, fullName, email, role, ... }

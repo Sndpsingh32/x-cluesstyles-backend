@@ -27,6 +27,9 @@ import { createProductController } from './controllers/product.controller.js';
 import { createOrderRepository } from './repositories/order.repository.js';
 import { createOrderService } from './services/order.service.js';
 import { createOrderController } from './controllers/order.controller.js';
+import { createSavedDesignRepository } from './repositories/savedDesign.repository.js';
+import { createSavedDesignService } from './services/savedDesign.service.js';
+import { createSavedDesignController } from './controllers/savedDesign.controller.js';
 
 export const createContainer = ({ db = getDatabase() } = {}) => {
   // --- Repositories ---
@@ -36,6 +39,7 @@ export const createContainer = ({ db = getDatabase() } = {}) => {
   const subSubCategoryRepository = createSubSubCategoryRepository({ db });
   const productRepository        = createProductRepository({ db });
   const orderRepository         = createOrderRepository({ db });
+  const savedDesignRepository    = createSavedDesignRepository({ db });
 
   // --- Services ---
   const userService           = createUserService({ userRepository });
@@ -46,6 +50,7 @@ export const createContainer = ({ db = getDatabase() } = {}) => {
   const subSubCategoryService = createSubSubCategoryService({ subSubCategoryRepository, subCategoryRepository });
   const productService        = createProductService({ productRepository });
   const orderService          = createOrderService({ orderRepository });
+  const savedDesignService    = createSavedDesignService({ savedDesignRepository });
 
   // --- Controllers ---
   const userController           = createUserController({ userService });
@@ -56,10 +61,11 @@ export const createContainer = ({ db = getDatabase() } = {}) => {
   const subSubCategoryController = createSubSubCategoryController({ subSubCategoryService });
   const productController        = createProductController({ productService });
   const orderController          = createOrderController({ orderService });
+  const savedDesignController    = createSavedDesignController({ savedDesignService });
 
   return Object.freeze({
-    userRepository, categoryRepository, subCategoryRepository, subSubCategoryRepository, productRepository, orderRepository,
-    userService, authService, healthService, categoryService, subCategoryService, subSubCategoryService, productService, orderService,
-    userController, authController, healthController, categoryController, subCategoryController, subSubCategoryController, productController, orderController,
+    userRepository, categoryRepository, subCategoryRepository, subSubCategoryRepository, productRepository, orderRepository, savedDesignRepository,
+    userService, authService, healthService, categoryService, subCategoryService, subSubCategoryService, productService, orderService, savedDesignService,
+    userController, authController, healthController, categoryController, subCategoryController, subSubCategoryController, productController, orderController, savedDesignController,
   });
 };

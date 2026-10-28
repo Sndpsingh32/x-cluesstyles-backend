@@ -10,6 +10,7 @@ import {
 import { createProductRouter } from './product.routes.js';
 import { createOrderRouter } from './order.routes.js';
 import { createUploadRouter } from './upload.routes.js';
+import { createSavedDesignRouter } from './savedDesign.routes.js';
 import { createContainer } from '../container.js';
 
 let _router;
@@ -24,6 +25,7 @@ const buildRouter = () => {
     subSubCategoryController,
     productController,
     orderController,
+    savedDesignController,
   } = createContainer();
 
   const router = Router();
@@ -39,6 +41,9 @@ const buildRouter = () => {
 
   // Users — JWT protected
   router.use('/users', createUserRouter({ userController }));
+
+  // Saved Designs — JWT protected
+  router.use('/designs', createSavedDesignRouter({ savedDesignController }));
 
   // Categories — public read / admin write
   router.use('/categories',       createCategoryRouter({ categoryController }));

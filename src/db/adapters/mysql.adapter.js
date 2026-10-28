@@ -320,6 +320,39 @@ export const createMySqlAdapter = (env) => {
     await ensureColumn('features', 'JSON NULL');
     await ensureColumn('variants', 'JSON NULL');
     await ensureColumn('seo', 'JSON NULL');
+
+    // saved_designs — independent design records per user
+    await query(`
+      CREATE TABLE IF NOT EXISTS saved_designs (
+        id              CHAR(36)      NOT NULL PRIMARY KEY,
+        user_id         CHAR(36)      NOT NULL,
+        design_name     VARCHAR(200)  NOT NULL DEFAULT 'My Design',
+        status          ENUM('draft','saved','ordered') NOT NULL DEFAULT 'saved',
+        product_id      VARCHAR(200)  NOT NULL,
+        product_name    VARCHAR(200)  NOT NULL,
+        product_slug    VARCHAR(200)  NULL,
+        category        VARCHAR(120)  NULL,
+        subcategory     VARCHAR(120)  NULL,
+        color           VARCHAR(80)   NULL,
+        size            VARCHAR(40)   NULL,
+        quantity        INT           NOT NULL DEFAULT 1,
+        order_type      VARCHAR(20)   NOT NULL DEFAULT 'customize',
+        printing_method VARCHAR(100)  NULL,
+        price           DECIMAL(10,2) NOT NULL DEFAULT 0,
+        total_price     DECIMAL(10,2) NOT NULL DEFAULT 0,
+        editor_config   JSON          NULL,
+        customization   JSON          NULL,
+        view_images     JSON          NULL,
+        preview_image   VARCHAR(2048) NULL,
+        notes           TEXT          NULL,
+        deleted_at      TIMESTAMP     NULL,
+        created_at      TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at      TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_user_id (user_id),
+        INDEX idx_user_product_status (user_id, product_id, status),
+        INDEX idx_user_created (user_id, created_at)
+      )
+    `);
   };
 
   // -------------------------------------------------------------------------
@@ -942,6 +975,131 @@ export const createMySqlAdapter = (env) => {
   });
 
   // -------------------------------------------------------------------------
+  // savedDesigns
+  // -------------------------------------------------------------------------
+  const parseDesignRow = (row) => row && ({
+    id:             row.id,
+    userId:         row.user_id,
+    designName:     row.design_name,
+    status:         row.status,
+    productId:      row.product_id,
+    productName:    row.product_name,
+    productSlug:    row.product_slug,
+    category:       row.category,
+    subcategory:    row.subcategory,
+    color:          row.color,
+    size:           row.size,
+    quantity:       Number(row.quantity ?? 1),
+    orderType:      row.order_type || 'customize',
+    printingMethod: row.printing_method,
+    price:          Number(row.price ?? 0),
+    totalPrice:     Number(row.total_price ?? 0),
+    editorConfig:   parseJsonField(row.editor_config, {}),
+    customization:  parseJsonField(row.customization, {}),
+    viewImages:     parseJsonField(row.view_images, {}),
+    previewImage:   row.preview_image,
+    notes:          row.notes,
+    createdAt:      row.created_at || row.createdAt,
+    updatedAt:      row.updated_at || row.updatedAt,
+  });
+
+  const savedDesigns = Object.freeze({
+    findAllByUser: async (userId, { page = 1, limit = 20, status, productId, category, printingMethod, search, sortBy = 'updatedAt', sortOrder = 'desc' } = {}) => {
+      const conditions = ['user_id = :userId', 'deleted_at IS NULL'];
+      const vals = { userId };
+      if (status)         { conditions.push('status = :status');                   vals.status         = status; }
+      if (productId)      { conditions.push('product_id = :productId');           vals.productId      = productId; }
+      if (category)       { conditions.push('category = :category');               vals.category       = category; }
+      if (printingMethod) { conditions.push('printing_method = :printingMethod'); vals.printingMethod = printingMethod; }
+      if (search)         {
+        conditions.push('(design_name LIKE :search OR product_name LIKE :search)');
+        vals.search = `%${search}%`;
+      }
+      const colMap = { updatedAt: 'updated_at', createdAt: 'created_at', designName: 'design_name', productName: 'product_name' };
+      const col = colMap[sortBy] || 'updated_at';
+      const dir = sortOrder === 'asc' ? 'ASC' : 'DESC';
+      const where = `WHERE ${conditions.join(' AND ')}`;
+      const offset = (page - 1) * limit;
+      const rows = await query(`SELECT * FROM saved_designs ${where} ORDER BY ${col} ${dir} LIMIT ${limit} OFFSET ${offset}`, vals);
+      const countRows = await query(`SELECT COUNT(*) AS total FROM saved_designs ${where}`, vals);
+      const total = Number(countRows[0]?.total ?? 0);
+      return { items: rows.map(parseDesignRow), total };
+    },
+
+    findById: async (id) => {
+      const row = await findOne('SELECT * FROM saved_designs WHERE id = :id AND deleted_at IS NULL', { id });
+      return parseDesignRow(row);
+    },
+
+    create: async (data) => {
+      const id = data.id || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : String(Date.now()));
+      await query(
+        `INSERT INTO saved_designs
+          (id, user_id, design_name, status, product_id, product_name, product_slug, category, subcategory,
+           color, size, quantity, order_type, printing_method, price, total_price,
+           editor_config, customization, view_images, preview_image, notes)
+         VALUES
+          (:id, :userId, :designName, :status, :productId, :productName, :productSlug, :category, :subcategory,
+           :color, :size, :quantity, :orderType, :printingMethod, :price, :totalPrice,
+           :editorConfig, :customization, :viewImages, :previewImage, :notes)`,
+        {
+          id,
+          userId:         data.userId,
+          designName:     data.designName     || 'My Design',
+          status:         data.status         || 'saved',
+          productId:      data.productId,
+          productName:    data.productName,
+          productSlug:    data.productSlug    || null,
+          category:       data.category       || null,
+          subcategory:    data.subcategory    || null,
+          color:          data.color          || null,
+          size:           data.size           || null,
+          quantity:       Number(data.quantity || 1),
+          orderType:      data.orderType      || 'customize',
+          printingMethod: data.printingMethod || null,
+          price:          Number(data.price   || 0),
+          totalPrice:     Number(data.totalPrice || 0),
+          editorConfig:   JSON.stringify(data.editorConfig   || {}),
+          customization:  JSON.stringify(data.customization  || {}),
+          viewImages:     JSON.stringify(data.viewImages     || {}),
+          previewImage:   data.previewImage   || null,
+          notes:          data.notes          || null,
+        },
+      );
+      return savedDesigns.findById(id);
+    },
+
+    update: async (id, fields) => {
+      const colMap = {
+        designName: 'design_name', status: 'status', color: 'color', size: 'size',
+        quantity: 'quantity', orderType: 'order_type', printingMethod: 'printing_method',
+        price: 'price', totalPrice: 'total_price', editorConfig: 'editor_config',
+        customization: 'customization', viewImages: 'view_images', previewImage: 'preview_image',
+        notes: 'notes',
+      };
+      const valid = Object.entries(fields).filter(([k]) => colMap[k]);
+      if (!valid.length) return savedDesigns.findById(id);
+      const assignments = valid.map(([k]) => `${colMap[k]} = :${k}`).join(', ');
+      const payload = { id, ...Object.fromEntries(valid) };
+      if (payload.editorConfig)   payload.editorConfig   = JSON.stringify(payload.editorConfig);
+      if (payload.customization)  payload.customization  = JSON.stringify(payload.customization);
+      if (payload.viewImages)     payload.viewImages     = JSON.stringify(payload.viewImages);
+      await query(`UPDATE saved_designs SET ${assignments} WHERE id = :id`, payload);
+      return savedDesigns.findById(id);
+    },
+
+    softDelete: async (id) => {
+      await query('UPDATE saved_designs SET deleted_at = NOW() WHERE id = :id', { id });
+      return true;
+    },
+
+    countByUser: async (userId) => {
+      const rows = await query('SELECT COUNT(*) AS total FROM saved_designs WHERE user_id = :userId AND deleted_at IS NULL', { userId });
+      return Number(rows[0]?.total ?? 0);
+    },
+  });
+
+  // -------------------------------------------------------------------------
   return Object.freeze({
     client: 'mysql',
     checkConnection: () => query('SELECT 1'),
@@ -952,6 +1110,7 @@ export const createMySqlAdapter = (env) => {
     subsubcategories,
     products,
     orders,
+    savedDesigns,
     close: () => pool.end(),
   });
 };

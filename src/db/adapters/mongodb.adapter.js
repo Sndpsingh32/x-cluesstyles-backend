@@ -39,6 +39,49 @@ const userSchema = new mongoose.Schema(
   { timestamps: true, versionKey: false },
 );
 
+// ---------------------------------------------------------------------------
+// SavedDesign — independent document, one per saved design per user
+// ---------------------------------------------------------------------------
+const savedDesignSchema = new mongoose.Schema(
+  {
+    userId:       { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    designName:   { type: String, default: 'My Design', trim: true },
+    status:       { type: String, enum: ['draft', 'saved', 'ordered'], default: 'saved', index: true },
+    // Product info
+    productId:    { type: String, required: true, trim: true, index: true },
+    productName:  { type: String, required: true, trim: true },
+    productSlug:  { type: String, default: null, trim: true },
+    category:     { type: String, default: null, trim: true },
+    subcategory:  { type: String, default: null, trim: true },
+    // Variant selection
+    color:        { type: String, default: null, trim: true },
+    size:         { type: String, default: null, trim: true },
+    quantity:     { type: Number, default: 1, min: 1 },
+    orderType:    { type: String, enum: ['plain', 'customize', 'bulk'], default: 'customize' },
+    printingMethod: { type: String, default: null, trim: true },
+    // Pricing snapshot
+    price:        { type: Number, default: 0 },
+    totalPrice:   { type: Number, default: 0 },
+    // Full editor state — all logos, slots, text, layer order, etc.
+    editorConfig: { type: mongoose.Schema.Types.Mixed, default: {} },
+    // Legacy customization object for compatibility
+    customization:{ type: mongoose.Schema.Types.Mixed, default: {} },
+    // View images map: { front, back, left, right }
+    viewImages:   { type: mongoose.Schema.Types.Mixed, default: {} },
+    // Primary preview (front)
+    previewImage: { type: String, default: null },
+    // Notes / instructions
+    notes:        { type: String, default: null },
+    // Soft-delete
+    deletedAt:    { type: Date, default: null },
+  },
+  { timestamps: true, versionKey: false },
+);
+
+// Compound index for fast user-centric queries
+savedDesignSchema.index({ userId: 1, createdAt: -1 });
+savedDesignSchema.index({ userId: 1, productId: 1, status: 1 });
+
 const orderSchema = new mongoose.Schema(
   {
     productId: { type: String, required: true, trim: true },
@@ -129,11 +172,39 @@ const toOrder = (doc) =>
     updatedAt: doc.updatedAt,
   };
 
+const toSavedDesign = (doc) =>
+  doc && {
+    id:             doc._id.toString(),
+    userId:         doc.userId?.toString(),
+    designName:     doc.designName,
+    status:         doc.status,
+    productId:      doc.productId,
+    productName:    doc.productName,
+    productSlug:    doc.productSlug,
+    category:       doc.category,
+    subcategory:    doc.subcategory,
+    color:          doc.color,
+    size:           doc.size,
+    quantity:       Number(doc.quantity ?? 1),
+    orderType:      doc.orderType || 'customize',
+    printingMethod: doc.printingMethod,
+    price:          Number(doc.price ?? 0),
+    totalPrice:     Number(doc.totalPrice ?? 0),
+    editorConfig:   doc.editorConfig || {},
+    customization:  doc.customization || {},
+    viewImages:     doc.viewImages || {},
+    previewImage:   doc.previewImage,
+    notes:          doc.notes,
+    createdAt:      doc.createdAt,
+    updatedAt:      doc.updatedAt,
+  };
+
 export const createMongoDbAdapter = async (env) => {
   const connection = await mongoose.connect(env.MONGODB_URI, { dbName: env.MONGODB_DATABASE });
   const User = connection.models.User || connection.model('User', userSchema);
   const Product = connection.models.Product || connection.model('Product', productSchema);
   const Order = connection.models.Order || connection.model('Order', orderSchema);
+  const SavedDesign = connection.models.SavedDesign || connection.model('SavedDesign', savedDesignSchema);
 
   return Object.freeze({
     client: 'mongodb',
@@ -146,6 +217,7 @@ export const createMongoDbAdapter = async (env) => {
       await User.init();
       await Product.init();
       await Order.init();
+      await SavedDesign.init();
     },
 
     users: Object.freeze({
@@ -222,6 +294,58 @@ export const createMongoDbAdapter = async (env) => {
       delete: async (id) => {
         const result = await Order.deleteOne({ _id: id });
         return result.deletedCount > 0;
+      },
+    }),
+
+    savedDesigns: Object.freeze({
+      findAllByUser: async (userId, { page = 1, limit = 20, status, productId, category, printingMethod, search, sortBy = 'updatedAt', sortOrder = 'desc' } = {}) => {
+        if (!mongoose.isValidObjectId(userId)) return { items: [], total: 0 };
+        const query = { userId: new mongoose.Types.ObjectId(userId), deletedAt: null };
+        if (status) query.status = status;
+        if (productId) query.productId = productId;
+        if (category) query.category = category;
+        if (printingMethod) query.printingMethod = printingMethod;
+        if (search) query.$or = [{ designName: { $regex: search, $options: 'i' } }, { productName: { $regex: search, $options: 'i' } }];
+        const sortDir = sortOrder === 'asc' ? 1 : -1;
+        const sort = { [sortBy]: sortDir };
+        const skip = (page - 1) * limit;
+        const [items, total] = await Promise.all([
+          SavedDesign.find(query).sort(sort).skip(skip).limit(limit).lean(),
+          SavedDesign.countDocuments(query),
+        ]);
+        return { items: items.map(toSavedDesign), total };
+      },
+
+      findById: async (id) => {
+        if (!mongoose.isValidObjectId(id)) return null;
+        const doc = await SavedDesign.findOne({ _id: id, deletedAt: null });
+        return toSavedDesign(doc);
+      },
+
+      create: async (data) => {
+        const doc = await SavedDesign.create(data);
+        return toSavedDesign(doc);
+      },
+
+      update: async (id, fields) => {
+        if (!mongoose.isValidObjectId(id)) return null;
+        const doc = await SavedDesign.findByIdAndUpdate(
+          id,
+          { $set: fields },
+          { new: true, runValidators: true },
+        );
+        return toSavedDesign(doc);
+      },
+
+      softDelete: async (id) => {
+        if (!mongoose.isValidObjectId(id)) return false;
+        const result = await SavedDesign.findByIdAndUpdate(id, { $set: { deletedAt: new Date() } });
+        return !!result;
+      },
+
+      countByUser: async (userId) => {
+        if (!mongoose.isValidObjectId(userId)) return 0;
+        return SavedDesign.countDocuments({ userId: new mongoose.Types.ObjectId(userId), deletedAt: null });
       },
     }),
 
