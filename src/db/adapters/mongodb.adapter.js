@@ -82,6 +82,17 @@ const savedDesignSchema = new mongoose.Schema(
 savedDesignSchema.index({ userId: 1, createdAt: -1 });
 savedDesignSchema.index({ userId: 1, productId: 1, status: 1 });
 
+// ---------------------------------------------------------------------------
+// StudioConfig — singleton design studio configuration document
+// ---------------------------------------------------------------------------
+const studioConfigSchema = new mongoose.Schema(
+  {
+    key:    { type: String, required: true, unique: true, default: 'default' },
+    config: { type: mongoose.Schema.Types.Mixed, default: {} },
+  },
+  { timestamps: true, versionKey: false },
+);
+
 const orderSchema = new mongoose.Schema(
   {
     productId: { type: String, required: true, trim: true },
@@ -205,6 +216,7 @@ export const createMongoDbAdapter = async (env) => {
   const Product = connection.models.Product || connection.model('Product', productSchema);
   const Order = connection.models.Order || connection.model('Order', orderSchema);
   const SavedDesign = connection.models.SavedDesign || connection.model('SavedDesign', savedDesignSchema);
+  const StudioConfig = connection.models.StudioConfig || connection.model('StudioConfig', studioConfigSchema);
 
   return Object.freeze({
     client: 'mongodb',
@@ -218,6 +230,7 @@ export const createMongoDbAdapter = async (env) => {
       await Product.init();
       await Order.init();
       await SavedDesign.init();
+      await StudioConfig.init();
     },
 
     users: Object.freeze({
@@ -346,6 +359,23 @@ export const createMongoDbAdapter = async (env) => {
       countByUser: async (userId) => {
         if (!mongoose.isValidObjectId(userId)) return 0;
         return SavedDesign.countDocuments({ userId: new mongoose.Types.ObjectId(userId), deletedAt: null });
+      },
+    }),
+
+    studioConfig: Object.freeze({
+      getSingleton: async () => {
+        const doc = await StudioConfig.findOne({ key: 'default' }).lean();
+        if (!doc) return null;
+        return doc.config && typeof doc.config === 'object' ? doc.config : {};
+      },
+      upsert: async (config) => {
+        const value = config && typeof config === 'object' ? config : {};
+        await StudioConfig.findOneAndUpdate(
+          { key: 'default' },
+          { $set: { config: value } },
+          { upsert: true, new: true },
+        );
+        return value;
       },
     }),
 

@@ -16,6 +16,12 @@ export const createOrderService = ({ orderRepository }) =>
       const payload = {
         ...data,
         id: randomUUID(),
+        slug: data.slug ?? null,
+        category: data.category ?? null,
+        subcategory: data.subcategory ?? null,
+        customerName: data.customerName ?? null,
+        phone: data.phone ?? null,
+        notes: data.notes ?? null,
         orderType: data.orderType ?? 'plain',
         quantityMode: data.quantityMode ?? (data.orderType === 'bulk' ? 'bulk' : 'single'),
         quantity: Number(data.quantity ?? 1),

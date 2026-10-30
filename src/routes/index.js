@@ -11,6 +11,7 @@ import { createProductRouter } from './product.routes.js';
 import { createOrderRouter } from './order.routes.js';
 import { createUploadRouter } from './upload.routes.js';
 import { createSavedDesignRouter } from './savedDesign.routes.js';
+import { createStudioConfigRouter } from './studioConfig.routes.js';
 import { createContainer } from '../container.js';
 
 let _router;
@@ -26,6 +27,7 @@ const buildRouter = () => {
     productController,
     orderController,
     savedDesignController,
+    studioConfigController,
   } = createContainer();
 
   const router = Router();
@@ -44,6 +46,9 @@ const buildRouter = () => {
 
   // Saved Designs — JWT protected
   router.use('/designs', createSavedDesignRouter({ savedDesignController }));
+
+  // Design Studio configuration — public read / admin write
+  router.use('/studio', createStudioConfigRouter({ studioConfigController }));
 
   // Categories — public read / admin write
   router.use('/categories',       createCategoryRouter({ categoryController }));

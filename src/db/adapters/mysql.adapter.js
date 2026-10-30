@@ -353,6 +353,16 @@ export const createMySqlAdapter = (env) => {
         INDEX idx_user_created (user_id, created_at)
       )
     `);
+
+    // studio_config — singleton design studio configuration document
+    await query(`
+      CREATE TABLE IF NOT EXISTS studio_config (
+        id         CHAR(36)  NOT NULL PRIMARY KEY,
+        config     JSON      NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )
+    `);
   };
 
   // -------------------------------------------------------------------------
@@ -763,6 +773,18 @@ export const createMySqlAdapter = (env) => {
     create: async (data) => {
       const payload = {
         ...data,
+        id: data.id ?? null,
+        name: data.name ?? null,
+        slug: data.slug ?? null,
+        category: data.category ?? null,
+        subcategory: data.subcategory ?? null,
+        description: data.description ?? null,
+        image: data.image ?? null,
+        price: Number(data.price ?? 0),
+        compareAtPrice: data.compareAtPrice ?? null,
+        stock: Number(data.stock ?? 0),
+        active: data.active ?? true,
+        featured: data.featured ?? false,
         sku: data.sku ?? null,
         subsubcategory: data.subsubcategory ?? null,
         brand: data.brand ?? null,
@@ -792,6 +814,18 @@ export const createMySqlAdapter = (env) => {
         customization: JSON.stringify(data.customization ?? {}),
         seo: JSON.stringify(data.seo ?? {}),
       };
+      // mysql2 rejects undefined bind values — ensure every column has a value.
+      const PRODUCT_COLUMNS = [
+        'id', 'sku', 'category', 'subcategory', 'subsubcategory', 'name', 'slug', 'brand',
+        'shortDescription', 'description', 'type', 'status', 'image', 'thumbnail', 'price',
+        'compareAtPrice', 'costPrice', 'taxCategory', 'minOrderQty', 'stockManaged', 'stock',
+        'backorder', 'availability', 'shippingWeight', 'dimensions', 'bulkPricing',
+        'quantityDiscount', 'couponEligible', 'active', 'featured', 'tags', 'colors', 'sizes',
+        'images', 'specifications', 'features', 'variants', 'attributes', 'customization', 'seo',
+      ];
+      for (const key of PRODUCT_COLUMNS) {
+        if (payload[key] === undefined) payload[key] = null;
+      }
       await query(`
         INSERT INTO products (
           id, sku, category, subcategory, subsubcategory, name, slug, brand, short_description, description, type, status,
@@ -1100,6 +1134,25 @@ export const createMySqlAdapter = (env) => {
   });
 
   // -------------------------------------------------------------------------
+  // studioConfig — singleton design studio configuration
+  // -------------------------------------------------------------------------
+  const studioConfig = Object.freeze({
+    getSingleton: async () => {
+      const row = await findOne('SELECT config FROM studio_config WHERE id = :id', { id: 'default' });
+      return row ? parseJsonField(row.config, {}) : null;
+    },
+
+    upsert: async (config) => {
+      await query(
+        `INSERT INTO studio_config (id, config) VALUES (:id, :config)
+         ON DUPLICATE KEY UPDATE config = VALUES(config)`,
+        { id: 'default', config: JSON.stringify(config ?? {}) },
+      );
+      return studioConfig.getSingleton();
+    },
+  });
+
+  // -------------------------------------------------------------------------
   return Object.freeze({
     client: 'mysql',
     checkConnection: () => query('SELECT 1'),
@@ -1111,6 +1164,7 @@ export const createMySqlAdapter = (env) => {
     products,
     orders,
     savedDesigns,
+    studioConfig,
     close: () => pool.end(),
   });
 };

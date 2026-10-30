@@ -30,6 +30,9 @@ import { createOrderController } from './controllers/order.controller.js';
 import { createSavedDesignRepository } from './repositories/savedDesign.repository.js';
 import { createSavedDesignService } from './services/savedDesign.service.js';
 import { createSavedDesignController } from './controllers/savedDesign.controller.js';
+import { createStudioConfigRepository } from './repositories/studioConfig.repository.js';
+import { createStudioConfigService } from './services/studioConfig.service.js';
+import { createStudioConfigController } from './controllers/studioConfig.controller.js';
 
 export const createContainer = ({ db = getDatabase() } = {}) => {
   // --- Repositories ---
@@ -40,6 +43,7 @@ export const createContainer = ({ db = getDatabase() } = {}) => {
   const productRepository        = createProductRepository({ db });
   const orderRepository         = createOrderRepository({ db });
   const savedDesignRepository    = createSavedDesignRepository({ db });
+  const studioConfigRepository   = createStudioConfigRepository({ db });
 
   // --- Services ---
   const userService           = createUserService({ userRepository });
@@ -51,6 +55,7 @@ export const createContainer = ({ db = getDatabase() } = {}) => {
   const productService        = createProductService({ productRepository });
   const orderService          = createOrderService({ orderRepository });
   const savedDesignService    = createSavedDesignService({ savedDesignRepository });
+  const studioConfigService   = createStudioConfigService({ studioConfigRepository });
 
   // --- Controllers ---
   const userController           = createUserController({ userService });
@@ -62,10 +67,11 @@ export const createContainer = ({ db = getDatabase() } = {}) => {
   const productController        = createProductController({ productService });
   const orderController          = createOrderController({ orderService });
   const savedDesignController    = createSavedDesignController({ savedDesignService });
+  const studioConfigController   = createStudioConfigController({ studioConfigService });
 
   return Object.freeze({
-    userRepository, categoryRepository, subCategoryRepository, subSubCategoryRepository, productRepository, orderRepository, savedDesignRepository,
-    userService, authService, healthService, categoryService, subCategoryService, subSubCategoryService, productService, orderService, savedDesignService,
-    userController, authController, healthController, categoryController, subCategoryController, subSubCategoryController, productController, orderController, savedDesignController,
+    userRepository, categoryRepository, subCategoryRepository, subSubCategoryRepository, productRepository, orderRepository, savedDesignRepository, studioConfigRepository,
+    userService, authService, healthService, categoryService, subCategoryService, subSubCategoryService, productService, orderService, savedDesignService, studioConfigService,
+    userController, authController, healthController, categoryController, subCategoryController, subSubCategoryController, productController, orderController, savedDesignController, studioConfigController,
   });
 };
