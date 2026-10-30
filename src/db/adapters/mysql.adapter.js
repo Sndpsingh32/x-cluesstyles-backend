@@ -908,7 +908,7 @@ export const createMySqlAdapter = (env) => {
   });
 
   const orders = Object.freeze({
-    findAll: async ({ status, orderType, productId, q, page = 1, limit = 20 } = {}) => {
+    findAll: async ({ status, orderType, productId, q, from, to, page = 1, limit = 20 } = {}) => {
       const conditions = [];
       const vals = {};
 
@@ -919,6 +919,8 @@ export const createMySqlAdapter = (env) => {
         conditions.push('(LOWER(product_name) LIKE :search OR LOWER(color) LIKE :search OR LOWER(size) LIKE :search OR LOWER(customer_name) LIKE :search)');
         vals.search = `%${String(q).toLowerCase()}%`;
       }
+      if (from) { conditions.push('created_at >= :from'); vals.from = from; }
+      if (to) { conditions.push('created_at <= :to'); vals.to = to; }
 
       const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
       const safePage = Math.max(1, Number(page) || 1);

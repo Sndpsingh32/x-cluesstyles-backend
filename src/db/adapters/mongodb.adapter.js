@@ -299,6 +299,11 @@ export const createMongoDbAdapter = async (env) => {
         if (filters.status) query.status = filters.status;
         if (filters.orderType) query.orderType = filters.orderType;
         if (filters.productId) query.productId = filters.productId;
+        if (filters.from || filters.to) {
+          query.createdAt = {};
+          if (filters.from) query.createdAt.$gte = new Date(filters.from);
+          if (filters.to) query.createdAt.$lte = new Date(filters.to);
+        }
         return (await Order.find(query).sort({ createdAt: -1 })).map(toOrder);
       },
       findById: async (id) => (mongoose.isValidObjectId(id) ? toOrder(await Order.findById(id)) : null),
